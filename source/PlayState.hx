@@ -1,4 +1,4 @@
-package;
+package source;
 
 import flixel.FlxG;
 import flixel.FlxSprite;
@@ -12,7 +12,7 @@ import flixel.math.FlxMath; // Added for FlxMath.roundDecimal in updateDebugText
 class PlayState extends FlxState {
     var player:Player;
 
-    var enemyGroup = new FlxTypedGroup<Enemy>(1);
+    public var enemyGroup = new FlxTypedGroup<Enemy>(1);
     var obstacle:FlxSprite;
     var debugText:FlxText;
     var comboWindowText:FlxText; 
