@@ -185,42 +185,30 @@ class Enemy extends FlxGroup {
         super.update(elapsed);
 
         if (isDead) {
-            // If the sprite is already removed/destroyed, prevent further updates
             if (!sprite.exists || !exists) {
                 return;
             }
         }
 
-        // Update UI positions relative to the sprite
         healthBar.x = sprite.x + sprite.width / 2 - healthBar.width / 2;
         healthBar.y = sprite.y - 10;
         rankText.x = sprite.x + sprite.width / 2 - rankText.width / 2;
         rankText.y = healthBar.y - 10;
 
-        // Update timers
         if (attackTimer > 0) attackTimer -= elapsed;
         if (patrolTimer > 0) patrolTimer -= elapsed;
-        if (stunTimer > 0) stunTimer -= elapsed;
+        if (stunTimer > 0) stunTimer -= elapsed; 
         if (iframeTimer > 0) iframeTimer -= elapsed;
 
-
-        // State machine logic
         switch (currentState) {
-            case STATE_IDLE:
-                handleIdleState(elapsed);
-            case STATE_PATROL:
-                handlePatrolState(elapsed);
-            case STATE_CHASE:
-                handleChaseState(elapsed);
-            case STATE_ATTACK:
-                handleAttackState(elapsed);
-            case STATE_STUNNED:
-                handleStunnedState(elapsed);
-            case STATE_DEAD:
-                // Do nothing, object is dying/dead
+            case STATE_IDLE: handleIdleState(elapsed);
+            case STATE_PATROL: handlePatrolState(elapsed);
+            case STATE_CHASE: handleChaseState(elapsed);
+            case STATE_ATTACK: handleAttackState(elapsed);
+            case STATE_STUNNED: handleStunnedState(elapsed);
+            case STATE_DEAD: // Do nothing
         }
 
-        // Update telegraph sprite position even if enemy is moving
         if (telegraphSprite != null && telegraphSprite.alpha > 0) {
             telegraphSprite.setPosition(
                 sprite.x + sprite.width/2 - telegraphSprite.width/2,
@@ -230,250 +218,160 @@ class Enemy extends FlxGroup {
     }
 
     private function handleIdleState(elapsed:Float):Void {
-        // Maybe transition to patrol or chase if player is detected
         if (player != null && !player.isDead && FlxMath.distanceBetween(sprite, player.sprite) < 150) {
             currentState = STATE_CHASE;
         }
     }
 
     private function handlePatrolState(elapsed:Float):Void {
-        // Simple patrol logic
         if (patrolTimer <= 0) {
-            // Move in a random direction for a short duration
-            var angle = FlxG.random.float(0, 360); // Angle in degrees
-            // Convert angle to radians for sin/cos
-            var radians = angle * (Math.PI / 180);
-            sprite.velocity.x = Math.cos(radians) * speed;
-            sprite.velocity.y = Math.sin(radians) * speed;
+            var angle = FlxG.random.float(0, 360) * (Math.PI / 180);
+            sprite.velocity.x = Math.cos(angle) * speed;
+            sprite.velocity.y = Math.sin(angle) * speed;
             patrolTimer = FlxG.random.float(1, 3);
         }
-
-        // Transition to chase if player is near
         if (player != null && !player.isDead && FlxMath.distanceBetween(sprite, player.sprite) < 100) {
             currentState = STATE_CHASE;
         }
     }
 
     private function handleChaseState(elapsed:Float):Void {
-        if (player == null || player.isDead) { // Stop chasing if player is dead
+        if (player == null || player.isDead) { 
             sprite.velocity.set(0, 0);
-            currentState = STATE_IDLE; // Go back to idle
+            currentState = STATE_IDLE; 
             return;
         }
-
         var distanceToPlayer:Float = FlxMath.distanceBetween(sprite, player.sprite);
-
         if (distanceToPlayer <= attackRange) {
             currentState = STATE_ATTACK;
-            sprite.velocity.set(0,0); // Stop moving when attacking
+            sprite.velocity.set(0,0); 
         } else {
-            // Move towards the player using moveTowardsObject
-            FlxVelocity.moveTowardsObject(sprite, player.sprite, speed); // Removed second speed arg, not needed
+            FlxVelocity.moveTowardsObject(sprite, player.sprite, speed); 
         }
     }
 
-    /**
-     * Handles enemy attack state with telegraphing and lunge.
-     */
     private function handleAttackState(elapsed:Float):Void {
-        if (player == null || player.isDead) { // Stop attacking if player is dead
+        if (player == null || player.isDead) { 
             isWindingUpAttack = false;
-            telegraphSprite.alpha = 0;
-            currentState = STATE_IDLE; // Go back to idle
+            if (telegraphSprite != null) telegraphSprite.alpha = 0;
+            currentState = STATE_IDLE; 
             return;
         }
-
-        // Stop moving when attacking or winding up
         sprite.velocity.set(0, 0);
-
         var distanceToPlayer:Float = FlxMath.distanceBetween(sprite, player.sprite);
-
-        if (distanceToPlayer > attackRange * 1.5) { // Increased range for player to move out of
-            // Player moved out of attack range, disengage
+        if (distanceToPlayer > attackRange * 1.5) { 
             isWindingUpAttack = false;
-            telegraphSprite.alpha = 0;
+            if (telegraphSprite != null) telegraphSprite.alpha = 0;
             currentState = STATE_CHASE;
             return;
         }
-
         if (!isWindingUpAttack && attackTimer <= 0) {
-            // Start attack windup
             isWindingUpAttack = true;
-            attackWindupTimer = 0.5; // Half second telegraph
-
-            // Store attack direction at the beginning of windup
-            attackDirection = new FlxPoint(
-                player.sprite.x - sprite.x,
-                player.sprite.y - sprite.y
-            );
+            attackWindupTimer = 0.5; 
+            attackDirection = new FlxPoint(player.sprite.x - sprite.x, player.sprite.y - sprite.y);
             attackDirection.normalize();
-
-            // Show telegraph
-            telegraphSprite.setPosition(
-                sprite.x + sprite.width/2 - telegraphSprite.width/2,
-                sprite.y + sprite.height/2 - telegraphSprite.height/2
-            );
-            FlxTween.tween(telegraphSprite, {alpha: 0.3}, 0.2); // Fade in telegraph
+            if (telegraphSprite != null) {
+                telegraphSprite.setPosition(
+                    sprite.x + sprite.width/2 - telegraphSprite.width/2,
+                    sprite.y + sprite.height/2 - telegraphSprite.height/2
+                );
+                FlxTween.tween(telegraphSprite, {alpha: 0.3}, 0.2); 
+            }
         } else if (isWindingUpAttack) {
-            // During windup
             attackWindupTimer -= elapsed;
-
-            // Keep telegraph centered on enemy
-            telegraphSprite.setPosition(
-                sprite.x + sprite.width/2 - telegraphSprite.width/2,
-                sprite.y + sprite.height/2 - telegraphSprite.height/2
-            );
-
+            if (telegraphSprite != null) {
+                telegraphSprite.setPosition(
+                    sprite.x + sprite.width/2 - telegraphSprite.width/2,
+                    sprite.y + sprite.height/2 - telegraphSprite.height/2
+                );
+            }
             if (attackWindupTimer <= 0) {
-                // Attack is ready, perform it
                 performAttack();
                 isWindingUpAttack = false;
-                telegraphSprite.alpha = 0; // Hide telegraph
-                attackTimer = attackCooldown; // Start attack cooldown
-                currentState = STATE_CHASE; // Go back to chasing after attack
+                if (telegraphSprite != null) telegraphSprite.alpha = 0; 
+                attackTimer = attackCooldown; 
+                currentState = STATE_CHASE; 
             }
         }
     }
 
     private function handleStunnedState(elapsed:Float):Void {
-        sprite.velocity.set(0, 0); // Ensure enemy stops during stun
-        stunTimer -= elapsed;
+        sprite.velocity.set(0, 0); 
         if (stunTimer <= 0) {
-            currentState = STATE_CHASE; // Or return to idle/patrol
+            if (!isDead && currentState == STATE_STUNNED) { 
+                 currentState = STATE_CHASE; 
+            }
         }
     }
 
-    /**
-     * Performs the enemy's attack, including a lunge movement.
-     */
     private function performAttack():Void {
-        if (player == null || player.isDead) return; // Don't attack if player is dead
-
-        // Lunge toward player during attack (distance based on rank)
+        if (player == null || player.isDead) return;
         var lungeDistance = 40 + (enemyRank * 10);
         var lungeSpeed = 400 + (enemyRank * 50);
-
-        // Use the stored attack direction from windup
-        // If attackDirection is null (e.g. if enemy was created in attack state), calculate it
         if (attackDirection == null) {
-            attackDirection = new FlxPoint(
-                player.sprite.x - sprite.x,
-                player.sprite.y - sprite.y
-            );
+            attackDirection = new FlxPoint(player.sprite.x - sprite.x, player.sprite.y - sprite.y);
             attackDirection.normalize();
         }
-
-
-        // Apply lunge velocity
         sprite.velocity.x = attackDirection.x * lungeSpeed;
         sprite.velocity.y = attackDirection.y * lungeSpeed;
-
-        // Play attack animation (simple flicker for now)
-        FlxTween.tween(sprite, {alpha: 0.5}, 0.1).then(
-            FlxTween.tween(sprite, {alpha: 1.0}, 0.1)
-        );
-
-        // Stop lunge after short distance or duration
+        FlxTween.tween(sprite, {alpha: 0.5}, 0.1).then(FlxTween.tween(sprite, {alpha: 1.0}, 0.1));
         new FlxTimer().start(lungeDistance / lungeSpeed, function(_) {
             sprite.velocity.set(0, 0);
         });
-
-        // Deal damage to player if in range after lunge
-        new FlxTimer().start(0.1, function(_) { // Small delay to allow lunge to move enemy
+        new FlxTimer().start(0.1, function(_) { 
             if (player != null && !player.isDead) {
                 var newDistanceToPlayer = FlxMath.distanceBetween(sprite, player.sprite);
-                if (newDistanceToPlayer <= attackRange * 1.2) { // Slightly increased hit range after lunge
-                    player.takeDamage(calculateDamage());
+                if (newDistanceToPlayer <= attackRange * 1.2) { 
+                    player.takeDamage(calculateDamage(), this); // MODIFIED LINE
                 }
             }
         });
     }
 
-    /**
-     * Handles enemy taking damage, with knockback, flashing health bar, and damage numbers.
-     */
     public function takeDamage(amount:Float, knockback:Float = 0, isCritical:Bool = false):Void {
         if (isDead || iframeTimer > 0) return;
-
-        // Calculate damage reduction from defense
-        var damageReduction:Float = defense / (defense + 100); // More realistic defense scaling
+        var damageReduction:Float = defense / (defense + 100); 
         var reducedDamage:Float = amount * (1 - damageReduction);
-
-        // Ensure minimum damage of 1
         if (reducedDamage < 1) reducedDamage = 1;
-
-        // Apply damage
         health -= reducedDamage;
-
-        // Flash health bar red/white
         if (!flashingHealthBar) {
             flashingHealthBar = true;
-            healthBar.createFilledBar(FlxColor.fromRGB(80, 80, 80), FlxColor.WHITE); // Flash white
+            healthBar.createFilledBar(FlxColor.fromRGB(80, 80, 80), FlxColor.WHITE); 
             new FlxTimer().start(0.2, function(_) {
                 flashingHealthBar = false;
-                healthBar.createFilledBar(FlxColor.fromRGB(80, 80, 80), healthBarDefaultColor); // Revert to original
+                healthBar.createFilledBar(FlxColor.fromRGB(80, 80, 80), healthBarDefaultColor); 
             });
         }
-
-        // Create damage number indicator
         showDamageNumber(Math.ceil(reducedDamage), isCritical);
-
-        // Apply knockback if specified
         if (knockback > 0 && player != null) {
-            var knockbackDirection:FlxPoint = new FlxPoint(
-                sprite.x - player.sprite.x,
-                sprite.y - player.sprite.y
-            );
-            if (knockbackDirection.length > 0) {
-                knockbackDirection.normalize();
-            } else {
-                // If player is directly on top, push randomly
-                knockbackDirection.set(FlxG.random.float(-1, 1), FlxG.random.float(-1, 1)).normalize();
-            }
-
+            var knockbackDirection:FlxPoint = new FlxPoint(sprite.x - player.sprite.x, sprite.y - player.sprite.y);
+            if (knockbackDirection.length > 0) knockbackDirection.normalize();
+            else knockbackDirection.set(FlxG.random.float(-1, 1), FlxG.random.float(-1, 1)).normalize();
             sprite.velocity.x = knockbackDirection.x * knockback;
             sprite.velocity.y = knockbackDirection.y * knockback;
+            
+            // Apply stun when knocked back by player damage
+            stun(0.3); // Call the new stun method
 
-            // Enemy is briefly stunned by knockback
-            stunTimer = 0.3; // Duration of stun
-            currentState = STATE_STUNNED;
-            isWindingUpAttack = false; // Interrupt any ongoing windup
-            telegraphSprite.alpha = 0; // Hide telegraph
         }
-
-        // Visual feedback
         FlxFlicker.flicker(sprite, 0.2, 0.04);
-        iframeTimer = 0.3; // Short invulnerability after hit
-
-        // Check for death
+        iframeTimer = 0.3; 
         if (health <= 0) {
             die();
         }
     }
 
-    /**
-     * Displays a floating damage number above the enemy.
-     */
     private function showDamageNumber(damage:Int, isCritical:Bool = false):Void {
         var damageText:FlxText = new FlxText(
             sprite.x + FlxG.random.float(0, sprite.width),
-            sprite.y + FlxG.random.float(0, sprite.height / 2),
-            0,
-            Std.string(damage)
-        );
-
-        // Different formatting for critical hits
+            sprite.y + FlxG.random.float(0, sprite.height / 2),0, Std.string(damage) );
         if (isCritical) {
-            damageText.setFormat(null, 16, FlxColor.YELLOW, "center"); // Removed FlxTextBorderStyle.OUTLINE
-            damageText.text = "CRIT! " + damageText.text; // Add "CRIT!" text
+            damageText.setFormat(null, 16, FlxColor.YELLOW, "center"); 
+            damageText.text = "CRIT! " + damageText.text; 
         } else {
             damageText.setFormat(null, 12, FlxColor.WHITE);
         }
-
-        // Add to the state, not the enemy group, so it renders independently
         (cast FlxG.state).add(damageText);
-
-        // Animate damage number floating up and fading
         FlxTween.tween(damageText, {y: damageText.y - 20, alpha: 0}, 0.5, {
             onComplete: function(_) {
                 (cast FlxG.state).remove(damageText);
@@ -482,85 +380,64 @@ class Enemy extends FlxGroup {
         });
     }
 
-    // Calculate final damage (for enemy's own attack)
     public function calculateDamage(isPhysical:Bool = true, baseDamage:Float = -1):Float {
         var damage:Float;
-
-        if (baseDamage < 0) {
-            damage = attackPower;
-        } else {
-            damage = baseDamage;
-        }
-
-        // Enemies could have critical hits too, but for simplicity, not implemented here.
+        if (baseDamage < 0) damage = attackPower;
+        else damage = baseDamage;
         return damage;
     }
 
-    /**
-     * Handles enemy death, including particles, fade out, XP gain, and loot drop.
-     */
+    public function stun(duration:Float):Void {
+        if (isDead || currentState == STATE_STUNNED) { return; }
+        currentState = STATE_STUNNED;
+        stunTimer = duration;
+        sprite.velocity.set(0, 0); 
+        if (isWindingUpAttack) {
+            isWindingUpAttack = false;
+            if (telegraphSprite != null) { telegraphSprite.alpha = 0; }
+        }
+        FlxFlicker.flicker(sprite, duration, 0.06, false, function(_){
+            if (stunTimer <= 0 && !isDead && currentState == STATE_STUNNED) {
+                 currentState = STATE_CHASE; 
+            }
+        });
+        FlxG.log.add('Enemy stunned for ' + duration + 's');
+    }
+
     private function die():Void {
         isDead = true;
         health = 0;
         currentState = STATE_DEAD;
-
-        // Stop all movement
         sprite.velocity.set(0, 0);
-
-        // Create death particles
         createDeathEffect();
-
-        // Death animation (fade out and shrink)
         FlxTween.tween(sprite, {alpha: 0, scale: {x: 0.5, y: 0.5}}, 0.5, {
             onComplete: function(_) {
-                // Grant experience to player
-                if (player != null) {
-                    player.gainExperience(experienceValue);
-                }
-
-                // Drop loot (placeholder for now)
+                if (player != null) player.gainExperience(experienceValue);
                 dropLoot();
-
-                // Clear telegraph if any
                 if (telegraphSprite != null) {
                     telegraphSprite.alpha = 0;
                     (cast FlxG.state).remove(telegraphSprite);
                     telegraphSprite.destroy();
                 }
-
-                // Mark for removal from group and destroy
-                exists = false; // This will cause it to be removed from FlxTypedGroup
+                exists = false; 
                 destroy();
             }
         });
-
-        // Hide UI elements immediately
         healthBar.visible = false;
         rankText.visible = false;
     }
 
-    /**
-     * Creates a small explosion of particles when the enemy dies.
-     */
     private function createDeathEffect():Void {
-        for (i in 0...15) { // More particles for better effect
+        for (i in 0...15) { 
             var particle = new FlxSprite(
                 sprite.x + sprite.width/2 + FlxG.random.float(-5, 5),
-                sprite.y + sprite.height/2 + FlxG.random.float(-5, 5)
-            );
-            particle.makeGraphic(4, 4, sprite.color); // Particles match enemy color
-
-            // Random direction and speed
+                sprite.y + sprite.height/2 + FlxG.random.float(-5, 5) );
+            particle.makeGraphic(4, 4, sprite.color); 
             var angle = FlxG.random.float(0, 360) * (Math.PI / 180);
-            var radians = angle * (Math.PI / 180); // Convert to radians
-            var speed = FlxG.random.float(80, 150); // Faster particles
-            particle.velocity.x = Math.cos(radians) * speed;
-            particle.velocity.y = Math.sin(radians) * speed;
-
-            // Add to the game state
+            var speed = FlxG.random.float(80, 150); 
+            particle.velocity.x = Math.cos(angle) * speed; 
+            particle.velocity.y = Math.sin(angle) * speed; 
             (cast FlxG.state).add(particle);
-
-            // Fade out and shrink
             FlxTween.tween(particle, {alpha: 0, scale: {x: 0.2, y: 0.2}}, 0.5 + FlxG.random.float(0, 0.2), {
                 onComplete: function(_) {
                     (cast FlxG.state).remove(particle);
@@ -570,20 +447,14 @@ class Enemy extends FlxGroup {
         }
     }
 
-    /**
-     * Placeholder for loot dropping logic.
-     */
     private function dropLoot():Void {
-        // Implement actual loot dropping here later
         FlxG.log.add("Enemy " + getRankString(enemyRank) + " killed! Loot dropped (placeholder).");
     }
 
     override public function destroy():Void {
         super.destroy();
-        // Ensure UI elements and telegraph sprite are destroyed if they haven't been removed already
         if (healthBar != null) healthBar.destroy();
         if (rankText != null) rankText.destroy();
         if (telegraphSprite != null) telegraphSprite.destroy();
-        // sprite is already part of the group, so super.destroy() handles it.
     }
 }

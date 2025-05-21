@@ -314,7 +314,7 @@ class Player extends FlxGroup {
 
     /**
      * Creates a visual attack effect at the player's attack point.
-     * FIXED: Proper handling of scale tweening
+     * FIXED: Proper handling of scale tweening and distinct combo effects.
      */
     private function createAttackEffect(comboCount:Int):Void {
         // If we don't have an effect sprite yet, create one
